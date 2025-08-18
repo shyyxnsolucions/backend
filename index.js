@@ -4,7 +4,8 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
-const cors = require("cors");
+// ❌ não vamos usar a lib cors aqui pra não conflitar
+// const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,37 +24,19 @@ const ALLOWED_ORIGIN =
   process.env.ALLOWED_ORIGIN || "https://projetoassina.vercel.app";
 
 /* =========================
-   CORS (lista de origens + preflight)
+   CORS Hotfix (sempre injeta header + preflight)
 ========================= */
-const ALLOWED_ORIGINS = [
-  ALLOWED_ORIGIN,         // produção
-  "http://localhost:3000", // dev
-  "http://localhost:5173"  // dev (Vite)
-].filter(Boolean);
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Permite requisições sem origin (ex.: Postman/cURL) ou origin da lista
-      if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-      return callback(new Error("Not allowed by CORS: " + origin), false);
-    },
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: false
-  })
-);
-
-// Garante headers no preflight (OPTIONS) e nas respostas
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
+  // injeta SEMPRE os headers de CORS
+  res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // responde imediatamente o preflight
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
   }
-  res.header("Vary", "Origin");
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
