@@ -77,7 +77,47 @@ app.post('/api/enviar-contrato', async (req, res) => {
       ]
     };
 
-    const response = await axios.post('https://api.autentique.com.br/v2/documents', payload, {
+    // === Envio para Autentique via GraphQL v2 ===
+const mutation = `
+  mutation CreateDocument($document: DocumentInput!, $signers: [SignerInput!]!) {
+    createDocument(document: $document, signers: $signers) {
+      id
+      name
+      url
+      signers { id email name }
+    }
+  }
+`;
+
+const variables = {
+  document: {
+    name: `Contrato de Desbloqueio - ${req.body.nome}`,
+    file: {
+      base64: contentBase64,
+      filename: "contrato.html",
+      mimetype: "text/html"
+    }
+  },
+  signers: [
+    { email: req.body.email, name: req.body.nome, action: "SIGN" },
+    { email: PRESTADOR_EMAIL, name: "Shyyxn Solucion", action: "SIGN" }
+  ]
+};
+
+const response = await axios.post(
+  "https://api.autentique.com.br/v2/graphql",
+  { query: mutation, variables },
+  {
+    headers: {
+      Authorization: `Bearer ${AUTENTIQUE_API_KEY}`,
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    timeout: 30000
+  }
+);
+
+  /* previous REST call removed */ const __ignore = await axios.post('https://api.autentique.com.br/v2/documents', payload, {
       headers: {
         Authorization: `Bearer ${AUTENTIQUE_API_KEY}`,
         'Content-Type': 'application/json'
