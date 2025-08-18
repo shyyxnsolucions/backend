@@ -1,51 +1,60 @@
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
-const axios = require("axios");
-const cors = require("cors");
+import express from "express";
+import cors from "cors";
+import axios from "axios";
+import fs from "fs";
+import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// ✅ Configure CORS corretamente para o seu frontend na Vercel
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*"; 
-app.use(cors({
-  origin: ALLOWED_ORIGIN,
-  methods: ["GET","POST","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization"],
-  credentials: false
-}));
+// Variáveis de ambiente
+const ZAPSIGN_API_KEY = process.env.ZAPSIGN_API_KEY;
+const PRESTADOR_EMAIL = process.env.PRESTADOR_EMAIL || "seuemail@provedor.com";
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 
-// middleware para garantir headers CORS e responder preflight
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
-  next();
+// Middlewares
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+app.use(
+  cors({
+    origin: ALLOWED_ORIGIN,
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Rota principal (teste rápido)
+app.get("/", (req, res) => {
+  res.send("API rodando com sucesso 🚀");
 });
 
-app.use(express.json({ limit: "10mb" }));
-
-// 🔑 Token da ZapSign
-const ZAPSIGN_API_KEY = process.env.ZAPSIGN_API_KEY || "af4b7afb-147a-4504-8ec2-9df65cd6fa7e75b82cc1-6f79-4eb3-8770-3b8a63e62035";
-
-// Email do prestador (você)
-const PRESTADOR_EMAIL = process.env.PRESTADOR_EMAIL || "contato@shyyxnsolucion.com";
-
-// === Rota para enviar contrato ===
+// Rota para enviar contrato
 app.post("/api/enviar-contrato", async (req, res) => {
   try {
-    const { nome, email, tipo } = req.body;
+    const ct = req.headers["content-type"] || "";
+
+    // Normaliza os campos do body
+    const body = req.body || {};
+    const nome =
+      body.nome || body.name || body.fullName || body.cliente || body["nomeCompleto"] || "";
+    const email = body.email || body.mail || body["e-mail"] || "";
+    const tipo =
+      body.tipo || body.tipoDesbloqueio || body.type || body.desbloqueio || body.servico || "";
 
     if (!nome || !email || !tipo) {
       return res.status(400).json({
         success: false,
-        error: "Dados incompletos. Esperado: { nome, email, tipo }"
+        error: "Dados incompletos. Esperado: { nome, email, tipo }",
+        received: body,
+        contentType: ct,
       });
     }
 
-    // Carrega e personaliza HTML do contrato
-    const contractPath = path.join(__dirname, "contract.html");
+    // Lê e personaliza HTML do contrato
+    const contractPath = path.join(process.cwd(), "contract.html");
     let contractHtml = fs.readFileSync(contractPath, "utf8");
     contractHtml = contractHtml
       .replace(/{{NOME_CLIENTE}}/g, nome)
@@ -59,15 +68,15 @@ app.post("/api/enviar-contrato", async (req, res) => {
         content_base64: Buffer.from(contractHtml).toString("base64"),
         signers: [
           { name: nome, email, autofill_email_subject: "Assine seu contrato de desbloqueio" },
-          { name: "Shyyxn Solucion", email: PRESTADOR_EMAIL }
-        ]
+          { name: "Shyyxn Solucion", email: PRESTADOR_EMAIL },
+        ],
       },
       {
         headers: {
           Authorization: `Token ${ZAPSIGN_API_KEY}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        timeout: 30000
+        timeout: 30000,
       }
     );
 
@@ -79,7 +88,7 @@ app.post("/api/enviar-contrato", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+// Inicia servidor
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
