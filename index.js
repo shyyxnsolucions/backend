@@ -31,7 +31,28 @@ const PRESTADOR_EMAIL = process.env.PRESTADOR_EMAIL || 'contato@shyyxnsolucion.c
 
 app.post('/api/enviar-contrato', async (req, res) => {
   try {
-    const { nome, email, tipo } = req.body;
+      // Normaliza diferentes formatos vindos do frontend
+      const body = req.body || {};
+      const nome = body.nome || body.name || body.fullName || body.cliente || '';
+      const email = body.email || body.mail || '';
+      const tipo = body.tipo || body.tipoDesbloqueio || body.type || body.desbloqueio || body.servico || '';
+
+      // Se o payload original já tinha esses campos, mantém prioridade
+      if (!body.nome && req.body.nome) {} // no-op apenas para manter compatibilidade
+
+      // Se algum campo essencial faltar, retorna erro informativo
+      if (!nome || !email || !tipo) {
+        return res.status(400).json({
+          success: false,
+          error: 'Dados incompletos. Esperado: { nome, email, tipo }',
+          received: body
+        });
+      }
+
+      // Sobrescreve req.body para o restante do fluxo
+      req.body = { nome, email, tipo };
+
+    // campos normalizados acima
     if (!nome || !email || !tipo) {
       return res.status(400).json({ success: false, error: 'Dados incompletos.' });
     }
